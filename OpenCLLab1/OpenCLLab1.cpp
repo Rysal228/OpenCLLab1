@@ -185,8 +185,91 @@ int main()
         return -1;
     }
 
-    printf("Очередь команд успешно создана.\n");
+    const char* opencl_source =
+        "__kernel void Simple (__global int *n) "
+        "{ *n = (*n) * 2; }\n";
 
+    cl_program opencl_program = clCreateProgramWithSource(
+        context,
+        1,
+        &opencl_source,
+        nullptr,
+        &err
+    );
+
+    err = clBuildProgram(
+        opencl_program,
+        1,
+        devices,
+        nullptr,
+        nullptr,
+        nullptr
+    );
+
+    cl_kernel kernel = clCreateKernel(
+        opencl_program,
+        "Simple",
+        &err
+    );
+
+    int value = 10;
+
+    cl_mem valueForGPU = clCreateBuffer(
+        context,
+        CL_MEM_READ_WRITE,
+        sizeof(int),
+        nullptr,
+        &err
+    );
+
+    clEnqueueWriteBuffer(
+        commandQueue,
+        valueForGPU,
+        CL_TRUE,
+        0,
+        sizeof(int),
+        &value,
+        0,
+        nullptr,
+        nullptr
+    );
+
+    clSetKernelArg(
+        kernel,
+        0,
+        sizeof(cl_mem),
+        &valueForGPU
+    );
+
+    size_t globalWorkSize = 1;
+
+    clEnqueueNDRangeKernel(
+        commandQueue,
+        kernel,
+        1,
+        nullptr,
+        &globalWorkSize,
+        nullptr,
+        0,
+        nullptr,
+        nullptr
+    );
+
+    clFinish(commandQueue);
+
+    clEnqueueReadBuffer(
+        commandQueue,
+        valueForGPU,
+        CL_TRUE,
+        0,
+        sizeof(int),
+        &value,
+        0,
+        nullptr,
+        nullptr
+    );
+
+    printf("Результат: %d\n", value);
 
     // ============================================================
     // Завершение работы
@@ -197,8 +280,6 @@ int main()
 
     delete[] devices;
     delete[] platforms;
-
-    printf("\nЭтапы инициализации OpenCL успешно выполнены.\n");
 
     return 0;
 }
